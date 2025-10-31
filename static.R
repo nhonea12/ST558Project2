@@ -1,0 +1,1 @@
+# work on creating tables and visualizations statically in the document
