@@ -57,7 +57,36 @@ ui <- fluidPage(
       # slider for the first numeric variable to be subsetted on
       sliderInput(inputId = "first_num_slider",
                   label = "Numeric Values:",
-                  min = 70, max = 150, value = c(70, 100)),
+                  min = 70, max = 150, value = c(70, 150)),
+      
+      # allow the user to set the minimum for the slider with dynamic UI
+      fluidRow(
+        column(7,
+               numericInput(inputId = "first_min_value",
+                            label = "Set slider min:",
+                            min = 50,
+                            max = 299,
+                            value = 70)),
+        column(5,
+               actionButton(inputId = "first_min_button",
+                            label = "Update the slider"
+               ))
+      ),
+
+      # allow the user to set the maximum for the slider with dynamic UI
+      fluidRow(
+        column(7,
+               numericInput(inputId = "first_max_value",
+                            label = "Set slider min:",
+                            min = 51,
+                            max = 300,
+                            value = 150)),
+        column(5,
+               actionButton(inputId = "first_max_button",
+                            label = "Update the slider"
+               ))
+      ),
+      
       # select second numeric variable that can be subsetted with a slider
       selectInput(inputId = "second_num_select",
                      label = "Numeric Variable to Subset:",
@@ -67,17 +96,49 @@ ui <- fluidPage(
                        "Total Combined Points" = "total_points"
                      ),
                      selected = "home_final_score"), 
-      # slider for the first numeric variable to be subsetted on
+      
+      # slider for the second numeric variable to be subsetted on
       sliderInput(inputId = "second_num_slider",
                   label = "Numeric Values:",
                   min = 70, max = 150, value = c(70, 150)),
+    
+    # allow the user to set the minimum for the slider with dynamic UI
+      fluidRow(
+        column(6,
+               numericInput(inputId = "second_min_value",
+                            label = "Set slider min:",
+                            min = 50,
+                            max = 299,
+                            value = 70)),
+        column(6,
+               actionButton(inputId = "second_min_button",
+                            label = "Update the slider"
+               ))
+      ),
+      
+      # allow the user to set the maximum for the slider with dynamic UI
+      fluidRow(
+         column(6,
+                numericInput(inputId = "second_max_value",
+                             label = "Set slider min:",
+                             min = 51,
+                             max = 300,
+                             value = 150)),
+         column(6,
+                actionButton(inputId = "second_max_button",
+                             label = "Update the slider"
+                ))
+        ),
+    
+      h3("Press Here To Subset!"),
+      # action button to subset the data
       actionButton("subset_button","Subset the Data")
     ),
       
     # main panel of the user interface
     mainPanel(
-      navset_card_underline(
-        nav_panel("About", 
+      tabsetPanel(
+        tabPanel("About", 
                   markdown(
           glue::glue("This app includes data from 209 regular season games played during the 2020-21 NBA season. You are able to view the points scored by by both the home and away teams in each game within the data, and can view how they interact with other variables, like the conferences of the teams. \n 
                   The data can be found on [kaggle](https://www.kaggle.com/datasets/schmadam97/nba-playbyplay-data-20182019). \n
@@ -90,17 +151,38 @@ ui <- fluidPage(
             width = "500px"
             )
           ),
-        nav_panel("Data Download", "contents"),
-        nav_panel("Data Exploration", "contents")
+        tabPanel("Data Download", p("Data download content coming soon")),
+        tabPanel("Data Exploration", p("Data exploration content coming soon"))
       )
     )
   )
 )
 # server function for the shiny app
 server <- function(input, output, session) {
-  # update the first slider input based on the numeric variable given
-  #updateSliderInput()
-}
 
+  # update the first slider minimum based on the number given by the user
+  observeEvent(input$first_min_button,
+               updateSliderInput(session,
+                                 "first_num_slider",
+                                 min = input$first_min_value))
+
+  # update the first slider maximum based on the number given by the user
+  observeEvent(input$first_max_button,
+               updateSliderInput(session,
+                                 "first_num_slider",
+                                 max = input$first_max_value))
+
+  # update the second slider minimum based on the number given by the user
+  observeEvent(input$second_min_button,
+               updateSliderInput(session,
+                                 "second_num_slider",
+                                 min = input$second_min_value))
+
+  # update the second slider maximum based on the number given by the user
+  observeEvent(input$second_max_button,
+               updateSliderInput(session,
+                                 "second_num_slider",
+                                 max = input$second_max_value))
+}
 # run the application
 shinyApp(ui = ui, server = server)
