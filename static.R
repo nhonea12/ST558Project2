@@ -119,6 +119,38 @@ ggplot(aes(x = home_final_score, colour = home_conference)) +
   ) + 
   scale_color_discrete(name = "Conference")
 
+
+# create a bar chart of shot types grouped by the conference of the home team
+nba_pbp |> 
+  filter(!is.na(ShotType)) |> 
+  ggplot(aes(x = ShotType, fill = home_conference)) +
+  geom_bar() + 
+  labs(
+    title = "Bar Chart of Shot Types",
+    subtitle = "Data from 2020-21 NBA Season",
+    x = "Shot Type",
+    y = "Frequency"
+  ) + 
+  scale_fill_discrete(name = "Home Team Conference")
+
+# create a scatter plot of points scored by home and away teams in each game (grouped by conference of home team)
+nba_pbp |> 
+  group_by(URL, away_conference, home_conference) |> 
+  summarise(
+    away_final_score = last(away_final_score),
+    home_final_score = last(home_final_score)
+  ) |> 
+  ungroup() |> 
+  ggplot(aes(x = away_final_score, y = home_final_score, colour = home_conference)) + 
+  geom_point() + 
+  labs(
+    title = "Home and Away Scores of Games",
+    subtitle = "Colored by Home Team's Conference",
+    x = "Away Team Score",
+    y = "Home Team Score"
+  ) + 
+  scale_color_discrete(name = "Home Team Conference")
+
 # use a plot with faceting:
 # scatter plot with faceting the home and away finals scores of every game, faceted by the conferences of the home and away team
 nba_pbp |> 

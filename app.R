@@ -3,6 +3,8 @@ library(shiny)
 library(bslib)
 library(ggridges)
 library(janitor)
+#install.packages("shinycssloaders")
+library(shinycssloaders)
 
 
 # read in the NBA play by play data from the 2020-21 season
@@ -211,10 +213,19 @@ ui <- fluidPage(
                             tableOutput(outputId = "mean_sd_scores")
                             ),
                    tabPanel("Graphs and Charts", 
-                            plotOutput(outputId = "densityplot"),
-                            plotOutput(outputId = "histogram"),
-                            plotOutput(outputId = "scatter_facet"),
-                            plotOutput(outputId = "ridgeplot")
+                            h3("Bar Chart:"),
+                            shinycssloaders::withSpinner(plotOutput(outputId = "barchart")),
+                            h3("Density Plot:"),
+                            shinycssloaders::withSpinner(plotOutput(outputId = "densityplot")),
+                            h3("Histogram:"),
+                            shinycssloaders::withSpinner(plotOutput(outputId = "histogram")),
+                            h3("Scatter Plot:"),
+                            shinycssloaders::withSpinner(plotOutput(outputId = "scatterplot")),
+                            h3("Faceted Scatter Plot:"),
+                            shinycssloaders::withSpinner(plotOutput(outputId = "scatter_facet")),
+                            h3("Density Ridge Plot:"),
+                            shinycssloaders::withSpinner(plotOutput(outputId = "ridgeplot")
+                            )
                             )
                    )
                  )
@@ -411,6 +422,20 @@ server <- function(input, output, session) {
     }
   })
   
+  # bar chart
+  output$barchart <- renderPlot({
+    nba_subset() |> 
+      filter(!is.na(ShotType)) |> 
+      ggplot(aes(x = ShotType, fill = home_conference)) +
+      geom_bar() + 
+      labs(
+        title = "Bar Chart of Shot Types",
+        subtitle = "Data from 2020-21 NBA Season",
+        x = "Shot Type",
+        y = "Frequency"
+      ) + 
+      scale_fill_discrete(name = "Home Team Conference")
+  })
   # density plot
   output$densityplot <- renderPlot({
     nba_subset() |> 
@@ -443,6 +468,26 @@ server <- function(input, output, session) {
         y = "Frequency"
       ) + 
       scale_color_discrete(name = "Conference")
+  })
+  
+  # normal scatterplot
+  output$scatterplot <- renderPlot({
+    nba_subset() |> 
+      group_by(URL, away_conference, home_conference) |> 
+      summarise(
+        away_final_score = last(away_final_score),
+        home_final_score = last(home_final_score)
+      ) |> 
+      ungroup() |> 
+      ggplot(aes(x = away_final_score, y = home_final_score, colour = home_conference)) + 
+      geom_point() + 
+      labs(
+        title = "Home and Away Scores of Games",
+        subtitle = "Colored by Home Team's Conference",
+        x = "Away Team Score",
+        y = "Home Team Score"
+      ) + 
+      scale_color_discrete(name = "Home Team Conference")
   })
   
   # faceted scatterplot
