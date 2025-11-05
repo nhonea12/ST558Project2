@@ -202,6 +202,7 @@ ui <- fluidPage(
                             checkboxInput(inputId = "score_group_check",
                                           label = "Check for Grouping Variable:"),
                             conditionalPanel(condition = "input.score_group_check == true", 
+                                             
                                              selectInput(inputId = "score_group",
                                                          label = "Group by:",
                                                          choices = c(
@@ -224,8 +225,29 @@ ui <- fluidPage(
                             h3("Faceted Scatter Plot:"),
                             shinycssloaders::withSpinner(plotOutput(outputId = "scatter_facet")),
                             h3("Density Ridge Plot:"),
+                            selectInput(inputId = "ridge_conf",
+                                        label = "Group by Conference:",
+                                        choices = c(
+                                          "Away Team Conference" = "away_conference",
+                                          "Home Team Conference" = "home_conference"
+                                        ),
+                                        selected = "home_conference"),
+                            selectInput(inputId = "ridge_team",
+                                        label = "Group by Team:",
+                                        choices = c(
+                                          "Away Team" = "AwayTeam",
+                                          "Home Team" = "HomeTeam"
+                                        ),
+                                        selected = "HomeTeam"),
+                            selectInput(inputId = "ridge_team_points",
+                                        label = "Points of Which Team:",
+                                        choices = c(
+                                          "Away Team Points Scored" = "away_final_score",
+                                          "Home Team Points Scored" = "home_final_score"
+                                        ),
+                                        selected = "home_final_score"),
                             shinycssloaders::withSpinner(plotOutput(outputId = "ridgeplot")
-                            )
+                              )
                             )
                    )
                  )
@@ -233,6 +255,7 @@ ui <- fluidPage(
     )
   )
 )
+
 # server function for the shiny app
 server <- function(input, output, session) {
   
@@ -512,19 +535,39 @@ server <- function(input, output, session) {
   
   # output the ridge plot
   output$ridgeplot <- renderPlot({
+    # create more readable but still reactive labels
+    score_label <- if (input$ridge_team_points == "home_final_score"){
+      "Home Team's Points"
+    }
+    else{
+      "Away Team's Points"
+    }
+    conf_label <- if (input$ridge_conf == "home_conference"){
+      "Home Team's Conference"
+    }
+    else{
+      "Away Team's Conference"
+    }
+    team_label <- if (input$ridge_team == "HomeTeam"){
+      "Home Team"
+    }
+    else{
+      "Away Team"
+    }
+    
     nba_subset() |> 
-      group_by(URL, away_conference, AwayTeam) |> 
-      summarise(away_final_score = last(away_final_score)) |> 
+      group_by(URL, !!sym(input$ridge_conf), !!sym(input$ridge_team)) |> 
+      summarise(!!sym(input$ridge_team_points) := last(!!sym(input$ridge_team_points ))) |> 
       ungroup() |> 
-      ggplot(aes(x = away_final_score, y = AwayTeam, fill = away_conference)) + 
+      ggplot(aes(x = !!sym(input$ridge_team_points) , y = !!sym(input$ridge_team), fill = !!sym(input$ridge_conf))) + 
       geom_density_ridges() + 
       labs(
-        title = "Away Team's Points Scored", 
-        subtitle = "From play-by-play data of part of 2020-21 NBA season",
-        x = "Away Team Points Scored",
-        y = "Away Team"
+        title = paste0(score_label, " Grouped by the ", conf_label, " and the ", team_label), 
+        subtitle = "From Play-by-Play Data of Part of 2020-21 NBA Season",
+        x = score_label,
+        y = team_label
       ) + 
-      scale_fill_discrete(name = "Conference")
+      scale_fill_discrete(name = conf_label)
   })
   
 }
