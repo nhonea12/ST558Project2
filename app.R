@@ -29,21 +29,22 @@ ui <- fluidPage(
       radioButtons(inputId = "away_conf",
                    label = "Away Team's Conference:",
                    choices = c(
-                     "All" = "all",
-                     "Eastern" = "eastern",
-                     "Western" = "western"
+                     "All" = "All",
+                     "Eastern" = "Eastern",
+                     "Western" = "Western"
                    ),
-                   selected = "all"),
+                   selected = "All"),
       
       # radio button for home team's conference
       radioButtons(inputId = "home_conf",
                    label = "Home Team's Conference:",
                    choices = c(
-                     "All" = "all",
-                     "Eastern" = "eastern",
-                     "Western" = "western"
+                     "All" = "All",
+                     "Eastern" = "Eastern",
+                     "Western" = "Western"
                    ),
-                   selected = "all"),
+                   selected = "All"),
+      
       # select first numeric variable that can be subsetted with a slider
       selectInput(inputId = "first_num_select",
                      label = "Numeric Variable to Subset:",
@@ -151,7 +152,10 @@ ui <- fluidPage(
             width = "500px"
             )
           ),
-        tabPanel("Data Download", p("Data download content coming soon")),
+        tabPanel("Data Download", 
+                 DT::dataTableOutput("nba_table"),
+                 downloadButton("nba_download", label = "Download Data")
+                 ),
         tabPanel("Data Exploration", p("Data exploration content coming soon"))
       )
     )
@@ -159,30 +163,75 @@ ui <- fluidPage(
 )
 # server function for the shiny app
 server <- function(input, output, session) {
-
+  
   # update the first slider minimum based on the number given by the user
   observeEvent(input$first_min_button,
-               updateSliderInput(session,
+               {updateSliderInput(session,
                                  "first_num_slider",
-                                 min = input$first_min_value))
+                                 min = input$first_min_value)})
 
   # update the first slider maximum based on the number given by the user
   observeEvent(input$first_max_button,
-               updateSliderInput(session,
+               {updateSliderInput(session,
                                  "first_num_slider",
-                                 max = input$first_max_value))
+                                 max = input$first_max_value)})
 
   # update the second slider minimum based on the number given by the user
   observeEvent(input$second_min_button,
-               updateSliderInput(session,
+               {updateSliderInput(session,
                                  "second_num_slider",
-                                 min = input$second_min_value))
+                                 min = input$second_min_value)})
 
   # update the second slider maximum based on the number given by the user
   observeEvent(input$second_max_button,
-               updateSliderInput(session,
+               {updateSliderInput(session,
                                  "second_num_slider",
-                                 max = input$second_max_value))
+                                 max = input$second_max_value)})
+  
+  # have the data update to the subset specified when the subset_button action button is pressed
+  nba_subset <- reactive({
+    # include the action button needed for the reactive expression to run
+    input$subset_button
+    
+    # use isolate so that the data subsets ONLY IF the subset_button action button is pressed
+    isolate({
+      # possible subset on away team's conference
+      sub1 <- if (input$away_conf == "All") {
+        nba_pbp
+      } else {
+        nba_pbp |> filter(away_conference == input$away_conf)
+      }
+      
+      # possible subset on home team's conference
+      sub2 <- if (input$home_conf == "All") {
+        sub1
+      } else {
+        sub1 |> filter(home_conference == input$home_conf)
+      }
+      
+      # possible subset on numeric point variables
+      sub3 <- sub2 |> filter(!!sym(input$first_num_select) >= input$first_num_slider[1],
+                             !!sym(input$first_num_select) <= input$first_num_slider[2],
+                             !!sym(input$second_num_select) >= input$second_num_slider[1],
+                             !!sym(input$second_num_select) <= input$second_num_slider[2])
+    })
+  })
+  
+  # create the reactive data table shown in the 'Data Download' tab with DT::dataTableOutput() and DT::renderDataTable()
+  output$nba_table <- DT::renderDataTable({
+    nba_subset()
+  })
+  
+  # allow the user to download the (possibly subsetted) data as a csv file
+  output$nba_download <- downloadHandler(
+    filename = function() {
+      paste0("nba-pbp-2020-21.csv")
+    },
+    content = function(file){
+      write_csv(nba_subset(), file)
+      }
+  )
+
 }
 # run the application
 shinyApp(ui = ui, server = server)
