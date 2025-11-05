@@ -1,6 +1,8 @@
 library(tidyverse)
 library(shiny)
 library(bslib)
+library(ggridges)
+library(janitor)
 
 
 # read in the NBA play by play data from the 2020-21 season
@@ -153,10 +155,25 @@ ui <- fluidPage(
             )
           ),
         tabPanel("Data Download", 
-                 DT::dataTableOutput("nba_table"),
+                 DT::dataTableOutput(outputId = "nba_table"),
                  downloadButton("nba_download", label = "Download Data")
                  ),
-        tabPanel("Data Exploration", p("Data exploration content coming soon"))
+        tabPanel("Data Exploration", 
+                 tabsetPanel(
+                   tabPanel("Contingency Tables", 
+                            tableOutput(outputId = "one_way_table"),
+                            tableOutput(outputId = "two_way_table")
+                            ),
+                   tabPanel("Numeric Summaries", 
+                            tableOutput(outputId = "mean_dist_outcome"),
+                            tableOutput(outputId = "mean_dist_type"),
+                            tableOutput(outputId = "mean_sd_scores")
+                            ),
+                   tabPanel("Graphs and Charts", 
+                            plotOutput(outputId = "ridgeplot")
+                            )
+                   )
+                 )
       )
     )
   )
@@ -231,7 +248,63 @@ server <- function(input, output, session) {
       write_csv(nba_subset(), file)
       }
   )
-
+  
+  # one-way contingency table of shot types
+  output$one_way_table <- renderTable({
+    nba_subset() |> 
+      tabyl(ShotType, show_na = FALSE)
+  })
+  
+  # two-way contingency table of shot types and results
+  output$two_way_table <- renderTable({
+    nba_subset() |> 
+      tabyl(ShotType, ShotOutcome, show_na = FALSE)
+  })
+  
+  # find the mean distance of made shots and missed shots
+  output$mean_dist_outcome <- renderTable({
+    nba_subset() |> 
+      filter(!is.na(ShotDist)) |> 
+      group_by(ShotOutcome) |> 
+      summarise(mean_dist = mean(ShotDist))
+  })
+  
+  # find the mean shot distance of different shot types
+  output$mean_dist_type <- renderTable({
+    nba_subset() |> 
+      filter(!is.na(ShotDist)) |> 
+      group_by(ShotType) |> 
+      summarise(shot_dist_mean = mean(ShotDist, na.rm = TRUE)) |> 
+      ungroup()
+  })
+  
+  # find the mean and standard deviation of final scores for away and home teams
+  output$mean_sd_scores <- renderTable({
+    nba_subset() |> 
+      summarise(away_score_mean = mean(away_final_score),
+                home_score_mean = mean(home_final_score),
+                away_score_sd = sd(away_final_score),
+                home_score_sd = sd(home_final_score)
+    )
+  })
+  
+  # output the ridge plot
+  output$ridgeplot <- renderPlot({
+    nba_subset() |> 
+      group_by(URL, away_conference, AwayTeam) |> 
+      summarise(away_final_score = last(away_final_score)) |> 
+      ungroup() |> 
+      ggplot(aes(x = away_final_score, y = AwayTeam, fill = away_conference)) + 
+      geom_density_ridges() + 
+      labs(
+        title = "Away Team's Points Scored", 
+        subtitle = "From play-by-play data of part of 2020-21 NBA season",
+        x = "Away Team Points Scored",
+        y = "Away Team"
+      ) + 
+      scale_fill_discrete(name = "Conference")
+  })
+  
 }
 # run the application
 shinyApp(ui = ui, server = server)
