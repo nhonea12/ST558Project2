@@ -161,7 +161,29 @@ ui <- fluidPage(
         tabPanel("Data Exploration", 
                  tabsetPanel(
                    tabPanel("Contingency Tables", 
+                            selectInput(inputId = "first_table_var",
+                                        label = "Select first variable",
+                                        choices = c(
+                                          "Shot Type" = "ShotType",
+                                          "Shot Outcome" = "ShotOutcome",
+                                          "Winning Team" = "WinningTeam",
+                                          "Away Team" = "AwayTeam",
+                                          "Home Team" = "HomeTeam"
+                                        ),
+                                        selected = "ShotType"),
+                            selectInput(inputId = "second_table_var",
+                                        label = "Select second variable",
+                                        choices = c(
+                                          "Shot Type" = "ShotType",
+                                          "Shot Outcome" = "ShotOutcome",
+                                          "Winning Team" = "WinningTeam",
+                                          "Away Team" = "AwayTeam",
+                                          "Home Team" = "HomeTeam"
+                                        ),
+                                        selected = "ShotOutcome"),
+                            h3("One-Way Contingency Table:"),
                             tableOutput(outputId = "one_way_table"),
+                            h3("Two-Way Contingency Table:"),
                             tableOutput(outputId = "two_way_table")
                             ),
                    tabPanel("Numeric Summaries", 
@@ -170,6 +192,9 @@ ui <- fluidPage(
                             tableOutput(outputId = "mean_sd_scores")
                             ),
                    tabPanel("Graphs and Charts", 
+                            plotOutput(outputId = "densityplot"),
+                            plotOutput(outputId = "histogram"),
+                            plotOutput(outputId = "scatter_facet"),
                             plotOutput(outputId = "ridgeplot")
                             )
                    )
@@ -205,6 +230,82 @@ server <- function(input, output, session) {
                                  "second_num_slider",
                                  max = input$second_max_value)})
   
+  #This code makes sure the select boxes update so they can't select the same variable in both!
+  # do this for the sidebar subsetting:
+  #first, update the second numeric variable selections available
+  observeEvent(input$first_num_select, {
+    first_num_select <- input$first_num_select
+    second_num_select <- input$second_num_select
+    choices <- c(
+      "Away Score" = "away_final_score",
+      "Home Score" = "home_final_score",
+      "Total Combined Points" = "total_points"
+    )
+    if (first_num_select != second_num_select){
+      choices <- choices[-which(choices == first_num_select)]
+      updateSelectizeInput(session,
+                           "second_num_select",
+                           choices = choices,
+                           selected = second_num_select)
+    }
+  })
+  #now, update the first numeric variable selections available
+  observeEvent(input$second_num_select, {
+    first_num_select <- input$first_num_select
+    second_num_select <- input$second_num_select
+    choices <- c(
+      "Away Score" = "away_final_score",
+      "Home Score" = "home_final_score",
+      "Total Combined Points" = "total_points"
+    )
+    if (first_num_select != second_num_select){
+      choices <- choices[-which(choices == second_num_select)]
+      updateSelectizeInput(session,
+                           "first_num_select",
+                           choices = choices,
+                           selected = first_num_select)
+    }
+  })
+  
+  # do this for the two-way contingency table:
+  #first, update the second numeric variable selections available
+  observeEvent(input$first_table_var, {
+    first_table_var <- input$first_table_var
+    second_table_var <- input$second_table_var
+    choices <- c(
+      "Shot Type" = "ShotType",
+      "Shot Outcome" = "ShotOutcome",
+      "Winning Team" = "WinningTeam",
+      "Away Team" = "AwayTeam",
+      "Home Team" = "HomeTeam"
+    )
+    if (first_table_var != second_table_var){
+      choices <- choices[-which(choices == first_table_var)]
+      updateSelectizeInput(session,
+                           "second_table_var",
+                           choices = choices,
+                           selected = second_table_var)
+    }
+  })
+  #now, update the first numeric variable selections available
+  observeEvent(input$second_table_var, {
+    first_table_var <- input$first_table_var
+    second_table_var <- input$second_table_var
+    choices <- c(
+      "Shot Type" = "ShotType",
+      "Shot Outcome" = "ShotOutcome",
+      "Winning Team" = "WinningTeam",
+      "Away Team" = "AwayTeam",
+      "Home Team" = "HomeTeam"
+    )
+    if (first_table_var != second_table_var){
+      choices <- choices[-which(choices == second_table_var)]
+      updateSelectizeInput(session,
+                           "first_table_var",
+                           choices = choices,
+                           selected = first_table_var)
+    }
+  })
   # have the data update to the subset specified when the subset_button action button is pressed
   nba_subset <- reactive({
     # include the action button needed for the reactive expression to run
@@ -251,14 +352,15 @@ server <- function(input, output, session) {
   
   # one-way contingency table of shot types
   output$one_way_table <- renderTable({
-    nba_subset() |> 
-      tabyl(ShotType, show_na = FALSE)
+    nba_subset() |>
+      tabyl(!!sym(input$first_table_var), show_na = FALSE)
   })
-  
+
   # two-way contingency table of shot types and results
   output$two_way_table <- renderTable({
-    nba_subset() |> 
-      tabyl(ShotType, ShotOutcome, show_na = FALSE)
+    nba_subset() |>
+      tabyl(!!sym(input$first_table_var), !!sym(input$second_table_var), show_na = FALSE) |>
+      mutate(across(where(is.numeric), as.integer))
   })
   
   # find the mean distance of made shots and missed shots
@@ -286,6 +388,60 @@ server <- function(input, output, session) {
                 away_score_sd = sd(away_final_score),
                 home_score_sd = sd(home_final_score)
     )
+  })
+  
+  # density plot
+  output$densityplot <- renderPlot({
+    nba_subset() |> 
+      group_by(URL, home_conference) |> 
+      summarise(total_points = last(total_points)) |> 
+      ungroup() |> 
+      ggplot(aes(x = total_points, colour = home_conference)) + 
+      geom_density(adjust = 0.5) + 
+      labs(
+        title = "Density of Total Points Scored in NBA Games",
+        subtitle = "Grouped by Conference of Home Team (Data from 2020-21 NBA Season)",
+        x = "Total Combined Points in Game",
+        y = "Density"
+      ) + 
+      scale_color_discrete(name = "Conference")
+  })
+  
+  #histogram
+  output$histogram <- renderPlot({
+    nba_subset() |> 
+      group_by(URL, away_conference) |> 
+      summarise(away_final_score = last(away_final_score)) |> 
+      ungroup() |> 
+      ggplot(aes(x = away_final_score, colour = away_conference)) + 
+      geom_histogram(binwidth = 5) + 
+      labs(
+        title = "Final Score of Away Teams",
+        subtitle = "Grouped by Conference (Data from 2020-21 NBA Season",
+        x = "Away Team Final Score",
+        y = "Frequency"
+      ) + 
+      scale_color_discrete(name = "Conference")
+  })
+  
+  # faceted scatterplot
+  output$scatter_facet <- renderPlot({
+    nba_subset() |> 
+      group_by(URL, away_conference, home_conference) |> 
+      summarise(
+        away_final_score = last(away_final_score),
+        home_final_score = last(home_final_score)
+      ) |> 
+      ungroup() |> 
+      ggplot(aes(x = away_final_score, y = home_final_score)) + 
+      geom_jitter() + 
+      facet_grid(away_conference~home_conference) + 
+      labs(
+        title = "Home and Away Scores of Games",
+        subtitle = "Grouped by Conferences of The Teams (Rows are away conference, columns are home conference)",
+        x = "Away Team Score",
+        y = "Home Team Score"
+      )
   })
   
   # output the ridge plot

@@ -21,11 +21,14 @@ table("Shot type" = nba_pbp$ShotType)
 table("Shot type" = nba_pbp$ShotType,
       "Shot Result" = nba_pbp$ShotOutcome)
 
+table("Shot type" = nba_pbp$ShotType,
+      "Shot Result" = nba_pbp$ShotOutcome)
+
 # one-way contingency table of shot types using tabyl() from janitor package
 nba_pbp |> 
   tabyl(ShotType, show_na = FALSE)
 
-# one-way contingency table of shot types using tabyl() from janitor package
+# two-way contingency table of shot types using tabyl() from janitor package
 nba_pbp |> 
   tabyl(ShotType, ShotOutcome, show_na = FALSE)
 
