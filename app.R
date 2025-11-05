@@ -187,8 +187,27 @@ ui <- fluidPage(
                             tableOutput(outputId = "two_way_table")
                             ),
                    tabPanel("Numeric Summaries", 
-                            tableOutput(outputId = "mean_dist_outcome"),
-                            tableOutput(outputId = "mean_dist_type"),
+                            h3("Mean Shot Distance Summary:"),
+                            selectInput(inputId = "shot_dist_group",
+                                        label = "Group by:",
+                                        choices = c(
+                                          "Shot Outcome" = "ShotOutcome",
+                                          "Shot Type" = "ShotType"
+                                        ),
+                                        selected = "ShotOutcome"),
+                            tableOutput(outputId = "mean_shot_dist"),
+                            h3("Mean and Standard Deviation of Scores:"),
+                            checkboxInput(inputId = "score_group_check",
+                                          label = "Check for Grouping Variable:"),
+                            conditionalPanel(condition = "input.score_group_check == true", 
+                                             selectInput(inputId = "score_group",
+                                                         label = "Group by:",
+                                                         choices = c(
+                                                           "Away Team" = "AwayTeam",
+                                                           "Home Team" = "HomeTeam",
+                                                           "Winning Team" = "WinningTeam"
+                                                         ),
+                                                         selected = "WinningTeam")),
                             tableOutput(outputId = "mean_sd_scores")
                             ),
                    tabPanel("Graphs and Charts", 
@@ -360,34 +379,36 @@ server <- function(input, output, session) {
   output$two_way_table <- renderTable({
     nba_subset() |>
       tabyl(!!sym(input$first_table_var), !!sym(input$second_table_var), show_na = FALSE) |>
-      mutate(across(where(is.numeric), as.integer))
+      mutate(across(where(is.numeric), as.integer)) # return counts as integers
   })
   
-  # find the mean distance of made shots and missed shots
-  output$mean_dist_outcome <- renderTable({
+  # find the mean distance of shots, grouped either by shot type or shot outcome
+  output$mean_shot_dist <- renderTable({
     nba_subset() |> 
       filter(!is.na(ShotDist)) |> 
-      group_by(ShotOutcome) |> 
-      summarise(mean_dist = mean(ShotDist))
-  })
-  
-  # find the mean shot distance of different shot types
-  output$mean_dist_type <- renderTable({
-    nba_subset() |> 
-      filter(!is.na(ShotDist)) |> 
-      group_by(ShotType) |> 
-      summarise(shot_dist_mean = mean(ShotDist, na.rm = TRUE)) |> 
-      ungroup()
+      group_by(!!sym(input$shot_dist_group)) |> 
+      summarise(mean_dist = mean(ShotDist, na.rm = TRUE))
   })
   
   # find the mean and standard deviation of final scores for away and home teams
   output$mean_sd_scores <- renderTable({
-    nba_subset() |> 
-      summarise(away_score_mean = mean(away_final_score),
-                home_score_mean = mean(home_final_score),
-                away_score_sd = sd(away_final_score),
-                home_score_sd = sd(home_final_score)
-    )
+    if (input$score_group_check){
+      nba_subset() |> 
+        group_by(!!sym(input$score_group)) |> 
+        summarise(away_score_mean = mean(away_final_score),
+                  home_score_mean = mean(home_final_score),
+                  away_score_sd = sd(away_final_score),
+                  home_score_sd = sd(home_final_score)
+        )
+    }
+    else {
+      nba_subset() |> 
+        summarise(away_score_mean = mean(away_final_score),
+                  home_score_mean = mean(home_final_score),
+                  away_score_sd = sd(away_final_score),
+                  home_score_sd = sd(home_final_score)
+        )
+    }
   })
   
   # density plot
