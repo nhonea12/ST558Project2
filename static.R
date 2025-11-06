@@ -135,7 +135,7 @@ nba_pbp |>
 
 # create a scatter plot of points scored by home and away teams in each game (grouped by conference of home team)
 nba_pbp |> 
-  group_by(URL, away_conference, home_conference) |> 
+  group_by(URL, home_conference) |> 
   summarise(
     away_final_score = last(away_final_score),
     home_final_score = last(home_final_score)

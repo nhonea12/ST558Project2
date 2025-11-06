@@ -221,15 +221,42 @@ ui <- fluidPage(
                             h3("Histogram:"),
                             shinycssloaders::withSpinner(plotOutput(outputId = "histogram")),
                             h3("Scatter Plot:"),
+                            selectInput(inputId = "scatter_group",
+                                        label = "Group by:",
+                                        choices = c(
+                                          "Away Team's Conference" = "away_conference",
+                                          "Home Team's Conference" = "home_conference"
+                                        ),
+                                        selected = "home_conference"),
                             shinycssloaders::withSpinner(plotOutput(outputId = "scatterplot")),
                             h3("Faceted Scatter Plot:"),
+                            selectInput(inputId = "facet_1",
+                                        label = "Row Facet:",
+                                        choices = c(
+                                          "Away Team's Conference" = "away_conference",
+                                          "Home Team's Conference" = "home_conference",
+                                          "Winning Team" = "WinningTeam",
+                                          "Away Team" = "AwayTeam",
+                                          "Home Team" = "HomeTeam"
+                                        ),
+                                        selected = "away_conference"),
+                            selectInput(inputId = "facet_2",
+                                        label = "Column Facet:",
+                                        choices = c(
+                                          "Away Team's Conference" = "away_conference",
+                                          "Home Team's Conference" = "home_conference",
+                                          "Winning Team" = "WinningTeam",
+                                          "Away Team" = "AwayTeam",
+                                          "Home Team" = "HomeTeam"
+                                        ),
+                                        selected = "home_conference"),
                             shinycssloaders::withSpinner(plotOutput(outputId = "scatter_facet")),
                             h3("Density Ridge Plot:"),
                             selectInput(inputId = "ridge_conf",
                                         label = "Group by Conference:",
                                         choices = c(
-                                          "Away Team Conference" = "away_conference",
-                                          "Home Team Conference" = "home_conference"
+                                          "Away Team's Conference" = "away_conference",
+                                          "Home Team's Conference" = "home_conference"
                                         ),
                                         selected = "home_conference"),
                             selectInput(inputId = "ridge_team",
@@ -359,6 +386,49 @@ server <- function(input, output, session) {
                            selected = first_table_var)
     }
   })
+  
+  # do this for variable selected to facet the faceted scatterplot:
+  #first, update the second numeric variable selections available
+  observeEvent(input$facet_1, {
+    facet_1 <- input$facet_1
+    facet_2 <- input$facet_2
+    choices <- c(
+      "Away Team's Conference" = "away_conference",
+      "Home Team's Conference" = "home_conference",
+      "Winning Team" = "WinningTeam",
+      "Away Team" = "AwayTeam",
+      "Home Team" = "HomeTeam"
+    )
+    if (facet_1 != facet_2){
+      choices <- choices[-which(choices == facet_1)]
+      updateSelectizeInput(session,
+                           "facet_2",
+                           choices = choices,
+                           selected = facet_2)
+    }
+  })
+  #now, update the first numeric variable selections available
+  observeEvent(input$facet_2, {
+    facet_1 <- input$facet_1
+    facet_2 <- input$facet_2
+    choices <- c(
+      "Away Team's Conference" = "away_conference",
+      "Home Team's Conference" = "home_conference",
+      "Winning Team" = "WinningTeam",
+      "Away Team" = "AwayTeam",
+      "Home Team" = "HomeTeam"
+    )
+    if (facet_1 != facet_2){
+      choices <- choices[-which(choices == facet_2)]
+      updateSelectizeInput(session,
+                           "facet_1",
+                           choices = choices,
+                           selected = facet_1)
+    }
+  })
+  
+  
+  
   # have the data update to the subset specified when the subset_button action button is pressed
   nba_subset <- reactive({
     # include the action button needed for the reactive expression to run
@@ -495,39 +565,64 @@ server <- function(input, output, session) {
   
   # normal scatterplot
   output$scatterplot <- renderPlot({
+    # create more readable but still reactive labels
+    scatter_label <- if(input$scatter_group == "home_conference"){
+      "Home Team's Conference"
+    }
+    else{
+      "Away Team's Conference"
+    }
+    
     nba_subset() |> 
-      group_by(URL, away_conference, home_conference) |> 
+      group_by(URL, !!sym(input$scatter_group)) |> 
       summarise(
         away_final_score = last(away_final_score),
         home_final_score = last(home_final_score)
       ) |> 
       ungroup() |> 
-      ggplot(aes(x = away_final_score, y = home_final_score, colour = home_conference)) + 
+      ggplot(aes(x = away_final_score, y = home_final_score, colour = !!sym(input$scatter_group))) + 
       geom_point() + 
       labs(
         title = "Home and Away Scores of Games",
-        subtitle = "Colored by Home Team's Conference",
+        subtitle = paste0("Colored by ", scatter_label),
         x = "Away Team Score",
         y = "Home Team Score"
       ) + 
-      scale_color_discrete(name = "Home Team Conference")
+      scale_color_discrete(name = scatter_label)
   })
   
   # faceted scatterplot
   output$scatter_facet <- renderPlot({
+    # create more readable but still reactive labels
+    facet_labels_list <- list(
+      away_conference = "Away Team's Conference",
+      home_conference = "Home Team's Conference",
+      WinningTeam = "Winning Team",
+      AwayTeam = "Away Team",
+      HomeTeam = "Home Team"
+    )
+    facet_label_1 <- facet_labels_list[[input$facet_1]]
+    facet_label_2 <- facet_labels_list[[input$facet_2]]
+    
     nba_subset() |> 
-      group_by(URL, away_conference, home_conference) |> 
+      group_by(URL, !!sym(input$facet_1), !!sym(input$facet_2)) |> 
       summarise(
         away_final_score = last(away_final_score),
         home_final_score = last(home_final_score)
       ) |> 
       ungroup() |> 
+      # make sure the faceting variables are factors
+      mutate(
+        across(c(!!sym(input$facet_1), !!sym(input$facet_2)), as.factor)
+      ) |> 
       ggplot(aes(x = away_final_score, y = home_final_score)) + 
       geom_jitter() + 
-      facet_grid(away_conference~home_conference) + 
+      facet_grid(rows = vars(!!sym(input$facet_1)),
+                 cols = vars(!!sym(input$facet_2))
+                 ) + 
       labs(
         title = "Home and Away Scores of Games",
-        subtitle = "Grouped by Conferences of The Teams (Rows are away conference, columns are home conference)",
+        subtitle = paste0("Grouped by the ", facet_label_1, " and the ", facet_label_2, " (Rows are ", facet_label_1, ", Columns are ", facet_label_2, ")"),
         x = "Away Team Score",
         y = "Home Team Score"
       )
