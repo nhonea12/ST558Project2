@@ -234,9 +234,29 @@ ui <- fluidPage(
                    tabPanel("Graphs and Charts", 
                             # include a bar chart
                             h3("Bar Chart:"),
+                            selectInput(inputId = "bar_group",
+                                        label = "Group By:",
+                                        choices = c(
+                                          "Away Team's Conference" = "away_conference",
+                                          "Home Team's Conference" = "home_conference",
+                                          "Winning Team" = "WinningTeam",
+                                          "Away Team" = "AwayTeam",
+                                          "Home Team" = "HomeTeam"
+                                        ),
+                                        selected = "home_conference"),
                             shinycssloaders::withSpinner(plotOutput(outputId = "barchart")),
                             # include a density plot
                             h3("Density Plot:"),
+                            selectInput(inputId = "density_group",
+                                        label = "Group By:",
+                                        choices = c(
+                                          "Away Team's Conference" = "away_conference",
+                                          "Home Team's Conference" = "home_conference",
+                                          "Winning Team" = "WinningTeam",
+                                          "Away Team" = "AwayTeam",
+                                          "Home Team" = "HomeTeam"
+                                        ),
+                                        selected = "home_conference"),
                             shinycssloaders::withSpinner(plotOutput(outputId = "densityplot")),
                             # include a histogram
                             h3("Histogram:"),
@@ -564,9 +584,20 @@ server <- function(input, output, session) {
   
   # bar chart
   output$barchart <- renderPlot({
+    
+    # create more readable but still reactive labels
+    bar_labels_list <- list(
+      away_conference = "Away Team's Conference",
+      home_conference = "Home Team's Conference",
+      WinningTeam = "Winning Team",
+      AwayTeam = "Away Team",
+      HomeTeam = "Home Team"
+    )
+    bar_label <- bar_labels_list[[input$bar_group]]
+    
     nba_subset() |> 
       filter(!is.na(ShotType)) |> 
-      ggplot(aes(x = ShotType, fill = home_conference)) +
+      ggplot(aes(x = ShotType, fill = !!sym(input$bar_group))) +
       geom_bar() + 
       labs(
         title = "Bar Chart of Shot Types",
@@ -574,15 +605,26 @@ server <- function(input, output, session) {
         x = "Shot Type",
         y = "Frequency"
       ) + 
-      scale_fill_discrete(name = "Home Team Conference")
+      scale_fill_discrete(name = bar_label)
   })
   # density plot
   output$densityplot <- renderPlot({
+    
+    # create more readable but still reactive labels
+    density_labels_list <- list(
+      away_conference = "Away Team's Conference",
+      home_conference = "Home Team's Conference",
+      WinningTeam = "Winning Team",
+      AwayTeam = "Away Team",
+      HomeTeam = "Home Team"
+    )
+    density_label <- density_labels_list[[input$density_group]]
+    
     nba_subset() |> 
-      group_by(URL, home_conference) |> 
+      group_by(URL, !!sym(input$density_group)) |> 
       summarise(total_points = last(total_points)) |> 
       ungroup() |> 
-      ggplot(aes(x = total_points, colour = home_conference)) + 
+      ggplot(aes(x = total_points, colour = !!sym(input$density_group))) + 
       geom_density(adjust = 0.5) + 
       labs(
         title = "Density of Total Points Scored in NBA Games",
@@ -590,7 +632,7 @@ server <- function(input, output, session) {
         x = "Total Combined Points in Game",
         y = "Density"
       ) + 
-      scale_color_discrete(name = "Conference")
+      scale_color_discrete(name = density_label)
   })
   
   #histogram
