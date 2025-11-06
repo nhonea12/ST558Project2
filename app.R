@@ -135,6 +135,7 @@ ui <- fluidPage(
                 ))
         ),
     
+      # header above subset button
       h3("Press Here To Subset!"),
       # action button to subset the data
       actionButton("subset_button","Subset the Data")
@@ -142,7 +143,9 @@ ui <- fluidPage(
       
     # main panel of the user interface
     mainPanel(
+      # create layout for different tabs
       tabsetPanel(
+        # create the About tab
         tabPanel("About", 
                   markdown(
           glue::glue("This app includes data from 209 regular season games played during the 2020-21 NBA season. You are able to view the points scored by by both the home and away teams in each game within the data, and can view how they interact with other variables, like the conferences of the teams. \n 
@@ -151,18 +154,26 @@ ui <- fluidPage(
                      The other tabs in this app allow you to view/download and explore the data! The 'Data Download' tab allows you to view the play-by-play data, only showing a subset of it if you specified a subset on the sidebar panel. It also includes a button that you can click to download the data! \n 
                      The 'Data Exploration' tab includes numeric and graphical summaries of the data. This includes summaries like the mean distances of different shot types, and the mean distance of made and missed shots. Also contingency tables of shot types and their results (made or missed). There are also graphical summaries of points scored by the home and away team (grouped by conference), total points scored in a game (grouped by the conference of the home team), scatterplots of the scores of each team in every game, faceted by the conference of the home and away teams, and ridge plots, showing the density of teams' points scored and allowed, both as the home team and the away team.")
             ),
+          # add the NBA logo as an image
           tags$img(
             src = "nba-logo.png",
             width = "500px"
             )
           ),
+        # create the data download tab
         tabPanel("Data Download", 
+                 # output the data (or the subset of it)
                  DT::dataTableOutput(outputId = "nba_table"),
+                 # add a download button
                  downloadButton("nba_download", label = "Download Data")
                  ),
+        # create the data exploration tab
         tabPanel("Data Exploration", 
+                 # create subtabs
                  tabsetPanel(
+                   # first subtab includes the contingency tables
                    tabPanel("Contingency Tables", 
+                            # allow for selection of variables
                             selectInput(inputId = "first_table_var",
                                         label = "Select first variable",
                                         choices = c(
@@ -183,12 +194,16 @@ ui <- fluidPage(
                                           "Home Team" = "HomeTeam"
                                         ),
                                         selected = "ShotOutcome"),
+                            # one-way table
                             h3("One-Way Contingency Table:"),
                             tableOutput(outputId = "one_way_table"),
+                            #two-way table
                             h3("Two-Way Contingency Table:"),
                             tableOutput(outputId = "two_way_table")
                             ),
+                   # create the numeric summaries subtab
                    tabPanel("Numeric Summaries", 
+                            # show the mean shot distances, grouped by either shot type or shot outcome
                             h3("Mean Shot Distance Summary:"),
                             selectInput(inputId = "shot_dist_group",
                                         label = "Group by:",
@@ -198,11 +213,13 @@ ui <- fluidPage(
                                         ),
                                         selected = "ShotOutcome"),
                             tableOutput(outputId = "mean_shot_dist"),
+                            # show the mean and standard deviation of scores for the home and away teams, with the option to group by team
                             h3("Mean and Standard Deviation of Scores:"),
+                            # checkbox allows grouping to be optional
                             checkboxInput(inputId = "score_group_check",
                                           label = "Check for Grouping Variable:"),
                             conditionalPanel(condition = "input.score_group_check == true", 
-                                             
+                                             # grouping by team
                                              selectInput(inputId = "score_group",
                                                          label = "Group by:",
                                                          choices = c(
@@ -213,13 +230,41 @@ ui <- fluidPage(
                                                          selected = "WinningTeam")),
                             tableOutput(outputId = "mean_sd_scores")
                             ),
+                   # last subtab has all of the visualizations
                    tabPanel("Graphs and Charts", 
+                            # include a bar chart
                             h3("Bar Chart:"),
                             shinycssloaders::withSpinner(plotOutput(outputId = "barchart")),
+                            # include a density plot
                             h3("Density Plot:"),
                             shinycssloaders::withSpinner(plotOutput(outputId = "densityplot")),
+                            # include a histogram
                             h3("Histogram:"),
+                            selectInput(inputId = "histogram_group",
+                                        label = "Group by:",
+                                        choices = c(
+                                          "Away Team's Conference" = "away_conference",
+                                          "Home Team's Conference" = "home_conference"
+                                        ),
+                                        selected = "home_conference"),
+                            selectInput(inputId = "histogram_points",
+                                        label = "Points of Which Team:",
+                                        choices = c(
+                                          "Away Team Final Score" = "away_final_score",
+                                          "Home Team Final Score" = "home_final_score"
+                                        ),
+                                        selected = "home_final_score"
+                                          ),
+                            # Input: Slider for the number of bins ----
+                            sliderInput(
+                              inputId = "bins",
+                              label = "Number of Bins:",
+                              min = 1,
+                              max = 50,
+                              value = 20
+                            ),
                             shinycssloaders::withSpinner(plotOutput(outputId = "histogram")),
+                            # include a standard scatterplot
                             h3("Scatter Plot:"),
                             selectInput(inputId = "scatter_group",
                                         label = "Group by:",
@@ -229,6 +274,7 @@ ui <- fluidPage(
                                         ),
                                         selected = "home_conference"),
                             shinycssloaders::withSpinner(plotOutput(outputId = "scatterplot")),
+                            # include a faceted scatterplot
                             h3("Faceted Scatter Plot:"),
                             selectInput(inputId = "facet_1",
                                         label = "Row Facet:",
@@ -251,6 +297,7 @@ ui <- fluidPage(
                                         ),
                                         selected = "home_conference"),
                             shinycssloaders::withSpinner(plotOutput(outputId = "scatter_facet")),
+                            # include a density ridge plot
                             h3("Density Ridge Plot:"),
                             selectInput(inputId = "ridge_conf",
                                         label = "Group by Conference:",
@@ -548,19 +595,41 @@ server <- function(input, output, session) {
   
   #histogram
   output$histogram <- renderPlot({
+    # create more readable but still reactive labels
+    group_label <- if(input$histogram_group == "home_conference"){
+      "Home Team's Conference"
+    }
+    else{
+      "Away Team's Conference"
+    }
+    
+    score_label <- if (input$histogram_points == "home_final_score"){
+      "Home Team's Points"
+    }
+    else{
+      "Away Team's Points"
+    }
+    
+    title_label <- if (input$histogram_points == "home_final_score"){
+      "Home Team"
+    }
+    else{
+      "Away Team"
+    }
+    
     nba_subset() |> 
-      group_by(URL, away_conference) |> 
-      summarise(away_final_score = last(away_final_score)) |> 
+      group_by(URL, !!sym(input$histogram_group)) |> 
+      summarise(!!sym(input$histogram_points) := last(!!sym(input$histogram_points))) |> 
       ungroup() |> 
-      ggplot(aes(x = away_final_score, colour = away_conference)) + 
-      geom_histogram(binwidth = 5) + 
+      ggplot(aes(x = !!sym(input$histogram_points), colour = !!sym(input$histogram_group))) + 
+      geom_histogram(bins = input$bins) + 
       labs(
-        title = "Final Score of Away Teams",
-        subtitle = "Grouped by Conference (Data from 2020-21 NBA Season",
-        x = "Away Team Final Score",
+        title = paste0("Final Score of ", title_label),
+        subtitle = paste0("Grouped by the ", group_label, " (Data from 2020-21 NBA Season)"),
+        x = score_label,
         y = "Frequency"
       ) + 
-      scale_color_discrete(name = "Conference")
+      scale_color_discrete(name = group_label)
   })
   
   # normal scatterplot
