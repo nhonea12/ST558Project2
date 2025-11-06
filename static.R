@@ -6,13 +6,11 @@ library(see)
 #install.packages("ggridges")
 library(ggridges)
 
-
+# read in the data
 nba_pbp <- read_csv("NBA_PBP_2020-21.csv")
-view(nba_pbp)
-unique(nba_pbp$ShotType)
-unique(nba_pbp$URL)
-unique(nba_pbp$AwayTeam)
-unique(nba_pbp$Quarter)
+
+# examine the data's structure
+str(nba_pbp)
 
 # one-way contingency table of shot types
 table("Shot type" = nba_pbp$ShotType)
